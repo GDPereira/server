@@ -1,0 +1,38 @@
+name: Deploy to Home Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create API .env.production
+        run: |
+          echo "${{ secrets.API_ENV_PRODUCTION }}" > apps/api/.env.production
+
+      - name: Create WEB .env.production
+        run: |
+          echo "${{ secrets.WEB_ENV_PRODUCTION }}" > apps/frontend/.env.production
+
+      - name: Install Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo 'export BUN_INSTALL="$HOME/.bun"' >> ~/.bashrc
+          echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
+
+      - name: Stop containers
+        run: docker compose down || true
+
+      - name: Build containers
+        run: docker compose build --no-cache
+
+      - name: Start containers
+        run: docker compose up -d
