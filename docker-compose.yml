@@ -3,12 +3,32 @@ services:
     image: postgres:15
     restart: always
     container_name: services_postgres_prod
-    env_file:
-      - ./apps/api/.env.production
+    env_file: ./apps/api/.env.production
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    env_file: ./apps/api/.env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      /bin/sh -c "
+        export DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$$POSTGRES_DB &&
+        bunx prisma migrate deploy --schema=packages/db/prisma/schema.prisma
+      "
+    restart: "no"
 
   api:
     build:
@@ -16,12 +36,17 @@ services:
       dockerfile: ./apps/api/Dockerfile
     container_name: api
     restart: always
-    env_file:
-      - ./apps/api/.env.production
+    env_file: ./apps/api/.env.production
     depends_on:
-      - postgres
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "5175:5175"
+    command: >
+      /bin/sh -c "
+        export DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$$POSTGRES_DB &&
+        bun dist/src/main.js
+      "
 
   web:
     build:
