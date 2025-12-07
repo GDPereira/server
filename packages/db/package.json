@@ -1,5 +1,5 @@
 {
-  "name": "db",
+  "name": "@db",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
@@ -9,7 +9,10 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@prisma/client": "^7.1.0",
-    "prisma": "^7.1.0"
+    "@prisma/client": "^6.8.0",
+    "prisma": "^6.8.0"
+  },
+  "exports": {
+    "./generated/": "./generated/prisma/index.js"
   }
 }
