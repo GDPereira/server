@@ -1,4 +1,4 @@
-import type { Service } from '../types/service';
+import type { Service } from "../types/service";
 
 interface ServiceTableProps {
   services: Service[];
@@ -7,15 +7,26 @@ interface ServiceTableProps {
   isDeleting?: boolean;
 }
 
-export function ServiceTable({ services, onEdit, onDelete, isDeleting }: ServiceTableProps) {
+export function ServiceTable({
+  services,
+  onEdit,
+  onDelete,
+  isDeleting,
+}: ServiceTableProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const handleClickLink = (link: string) => () => {
+    window.open(link, "_blank");
   };
 
   if (services.length === 0) {
     return (
       <div className="text-center py-12 bg-white rounded-lg shadow-md">
-        <p className="text-gray-500">No services found. Add one to get started.</p>
+        <p className="text-gray-500">
+          No services found. Add one to get started.
+        </p>
       </div>
     );
   }
@@ -35,6 +46,9 @@ export function ServiceTable({ services, onEdit, onDelete, isDeleting }: Service
               Created
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Link
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Updated
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -50,6 +64,14 @@ export function ServiceTable({ services, onEdit, onDelete, isDeleting }: Service
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {service.port}
+              </td>
+              <td
+                onClick={handleClickLink(
+                  `http://server.deluca.local:${service.port}`,
+                )}
+                className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+              >
+                {`http://server.deluca.local:${service.port}`}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {formatDate(service.createdAt)}
