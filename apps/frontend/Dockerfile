@@ -15,8 +15,10 @@ RUN bun run build
 FROM oven/bun:latest AS prod
 WORKDIR /app
 
-COPY --from=builder /app/node_modules ./node_modules
+RUN bun add serve
 
 COPY --from=builder /app/apps/frontend/dist ./dist
 
-CMD ["bun", "serve", "dist"]
+EXPOSE 5173
+
+CMD ["bunx", "serve", "-s", "dist", "-l", "5173"]
