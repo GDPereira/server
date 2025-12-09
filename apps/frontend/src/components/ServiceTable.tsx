@@ -43,10 +43,10 @@ export function ServiceTable({
               Port
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Created
+              Link
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Link
+              Created
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Updated
@@ -71,7 +71,13 @@ export function ServiceTable({
                 )}
                 className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
               >
-                {`http://server.deluca.local:${service.port}`}
+                <a
+                  onClick={(e) => e.preventDefault()}
+                  className="text-blue-600"
+                  href={`http://server.deluca.local:${service.port}`}
+                >
+                  {`http://server.deluca.local:${service.port}`}
+                </a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {formatDate(service.createdAt)}
