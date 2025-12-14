@@ -1,13 +1,18 @@
-name: Deploy to Home Server
+name: Deploy to Home Server (Blue/Green Ready)
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch: {}
 
 jobs:
   deploy:
     runs-on: self-hosted
+
+    env:
+      API_BLUE_PORT: 5175
+      API_GREEN_PORT: 5176
 
     steps:
       - name: Checkout repo
@@ -21,18 +26,40 @@ jobs:
         run: |
           echo "${{ secrets.WEB_ENV_PRODUCTION }}" > apps/frontend/.env.production
 
-      - name: Install Bun
+      - name: Install Bun (if not present)
         run: |
-          curl -fsSL https://bun.sh/install | bash
-          echo 'export BUN_INSTALL="$HOME/.bun"' >> ~/.bashrc
-          echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> ~/.bashrc
-          source ~/.bashrc
+          if !command -v bun &> /dev/null; then
+            curl -fsSL https://bun.sh/install | bash
+            export BUN_INSTALL="$HOME/.bun"
+            export PATH="$BUN_INSTALL/bin:$PATH"
+          fi
 
-      - name: Stop containers
-        run: docker compose down || true
+      - name: Build backend image
+        run: |
+          cd apps/api
+          docker build -t backend:${{ github.sha }} .
 
-      - name: Build containers
-        run: docker compose build --no-cache
+      - name: Stop previous GREEN (if exists)
+        run: |
+          docker rm -f api-green || true
 
-      - name: Start containers
-        run: docker compose up -d
+      - name: Start API GREEN
+        run: |
+          docker run -d \
+            --name api-green \
+            -e PORT=5175 \
+            -p 127.0.0.1:${{ env.API_GREEN_PORT }}:5175 \
+            backend:${{ github.sha }}
+
+      - name: Wait for API GREEN health
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:${{ env.API_GREEN_PORT }}/health; then
+              echo "API GREEN healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "API GREEN failed healthcheck"
+          exit 1
