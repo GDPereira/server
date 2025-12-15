@@ -92,7 +92,7 @@ jobs:
       - name: Reload nginx configuration
         run: |
           docker compose up -d nginx
-          docker exec nginx nginx -s reload
+          docker exec homelab-nginx nginx -s reload
 
       - name: Stop old API
         run: |
