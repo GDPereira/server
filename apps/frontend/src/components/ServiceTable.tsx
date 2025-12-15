@@ -66,17 +66,15 @@ export function ServiceTable({
                 {service.port}
               </td>
               <td
-                onClick={handleClickLink(
-                  `http://server.deluca.local:${service.port}`,
-                )}
+                onClick={handleClickLink(`${window.location}:${service.port}`)}
                 className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
               >
                 <a
                   onClick={(e) => e.preventDefault()}
                   className="text-blue-600"
-                  href={`http://server.deluca.local:${service.port}`}
+                  href={`${window.location}:${service.port}`}
                 >
-                  {`http://server.deluca.local:${service.port}`}
+                  {`${window.location}:${service.port}`}
                 </a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

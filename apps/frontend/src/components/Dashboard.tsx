@@ -40,7 +40,14 @@ export function Dashboard() {
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm("Are you sure you want to delete this service?")) return;
+    const isConfirmed = confirm(
+      "Are you sure you want to delete this service?",
+    );
+
+    if (!isConfirmed) {
+      return;
+    }
+
     deleteMutation.mutate(id);
   };
 

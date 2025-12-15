@@ -1,65 +1,91 @@
-name: Deploy to Home Server (Blue/Green Ready)
+name: Deploy to Home Server
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch: {}
 
 jobs:
   deploy:
     runs-on: self-hosted
-
-    env:
-      API_BLUE_PORT: 5175
-      API_GREEN_PORT: 5176
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Create API .env.production
-        run: |
-          echo "${{ secrets.API_ENV_PRODUCTION }}" > apps/api/.env.production
+        run: echo "${{ secrets.API_ENV_PRODUCTION }}" > apps/api/.env.production
 
       - name: Create WEB .env.production
-        run: |
-          echo "${{ secrets.WEB_ENV_PRODUCTION }}" > apps/frontend/.env.production
+        run: echo "${{ secrets.WEB_ENV_PRODUCTION }}" > apps/frontend/.env.production
 
-      - name: Install Bun (if not present)
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t homelab-api .
+
+      - name: Build Frontend image
+        run: docker build -f apps/frontend/Dockerfile -t homelab-web .
+
+      - name: Ensure postgres is running
+        run: docker compose up -d postgres
+
+      - name: Run migrations
+        run: docker compose up migrate
+
+      - name: Determine current active API
+        id: current
         run: |
-          if !command -v bun &> /dev/null; then
-            curl -fsSL https://bun.sh/install | bash
-            export BUN_INSTALL="$HOME/.bun"
-            export PATH="$BUN_INSTALL/bin:$PATH"
+          if grep -q "server api-green:5175" nginx/conf.d/default.conf 2>/dev/null; then
+            echo "active=green" >> $GITHUB_OUTPUT
+            echo "inactive=blue" >> $GITHUB_OUTPUT
+          else
+            echo "active=blue" >> $GITHUB_OUTPUT
+            echo "inactive=green" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build backend image
+      - name: Deploy inactive API
         run: |
-          cd apps/api
-          docker build -t backend:${{ github.sha }} .
+          echo "Deploying api-${{ steps.current.outputs.inactive }}..."
+          docker compose up -d api-${{ steps.current.outputs.inactive }}
 
-      - name: Stop previous GREEN (if exists)
+      - name: Wait for inactive API to be healthy
         run: |
-          docker rm -f api-green || true
-
-      - name: Start API GREEN
-        run: |
-          docker run -d \
-            --name api-green \
-            -e PORT=5175 \
-            -p 127.0.0.1:${{ env.API_GREEN_PORT }}:5175 \
-            backend:${{ github.sha }}
-
-      - name: Wait for API GREEN health
-        run: |
-          for i in {1..30}; do
-            if curl -sf http://127.0.0.1:${{ env.API_GREEN_PORT }}/health; then
-              echo "API GREEN healthy"
-              exit 0
+          echo "Waiting for api-${{ steps.current.outputs.inactive }} to be healthy..."
+          timeout=60
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' api-${{ steps.current.outputs.inactive }} 2>/dev/null || echo "unknown")
+            if [ "$status" = "healthy" ]; then
+              echo "api-${{ steps.current.outputs.inactive }} is healthy!"
+              break
             fi
-            sleep 2
+            echo "Status: $status - waiting..."
+            sleep 5
+            elapsed=$((elapsed + 5))
           done
+          if [ "$status" != "healthy" ]; then
+            echo "api-${{ steps.current.outputs.inactive }} failed to become healthy"
+            exit 1
+          fi
 
-          echo "API GREEN failed healthcheck"
-          exit 1
+      - name: Switch nginx to inactive API
+        run: |
+          sed -i 's/server api-${{ steps.current.outputs.active }}:5175;/server api-${{ steps.current.outputs.inactive }}:5175;/' nginx/conf.d/default.conf
+
+      - name: Reload nginx configuration
+        run: |
+          docker compose up -d nginx
+          docker exec nginx nginx -s reload
+
+      - name: Stop old API
+        run: |
+          echo "Stopping api-${{ steps.current.outputs.active }}..."
+          docker compose stop api-${{ steps.current.outputs.active }}
+
+      - name: Deploy Web
+        run: docker compose up -d web
+
+      - name: Verify deployment
+        run: |
+          echo "Active API: api-${{ steps.current.outputs.inactive }}"
+          echo "Frontend: web"
+          docker compose ps
