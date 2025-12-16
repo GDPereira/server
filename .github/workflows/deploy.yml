@@ -58,8 +58,8 @@ jobs:
       - name: Ensure nginx and web are running
         run: |
           if ! docker ps --format '{{.Names}}' | grep -q '^homelab-nginx$'; then
-            echo "Starting nginx and web..."
-            docker compose up -d web nginx
+            echo "Starting nginx and web-blue..."
+            docker compose up -d web-blue nginx
           else
             echo "Nginx is already running"
           fi
@@ -113,11 +113,57 @@ jobs:
           echo "Stopping api-${{ steps.current.outputs.active }}..."
           docker compose stop api-${{ steps.current.outputs.active }}
 
-      - name: Deploy Web
-        run: docker compose up -d web
+      - name: Determine current active Web
+        id: current_web
+        run: |
+          if docker exec homelab-nginx grep -q 'set \$frontend_upstream web-green:5173' /etc/nginx/conf.d/default.conf 2>/dev/null; then
+            echo "active=green" >> $GITHUB_OUTPUT
+            echo "inactive=blue" >> $GITHUB_OUTPUT
+          else
+            echo "active=blue" >> $GITHUB_OUTPUT
+            echo "inactive=green" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy inactive Web
+        run: |
+          echo "Deploying web-${{ steps.current_web.outputs.inactive }}..."
+          docker compose up -d web-${{ steps.current_web.outputs.inactive }}
+
+      - name: Wait for inactive Web to be healthy
+        run: |
+          echo "Waiting for web-${{ steps.current_web.outputs.inactive }} to be healthy..."
+          timeout=60
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' web-${{ steps.current_web.outputs.inactive }} 2>/dev/null || echo "unknown")
+            if [ "$status" = "healthy" ]; then
+              echo "web-${{ steps.current_web.outputs.inactive }} is healthy!"
+              break
+            fi
+            echo "Status: $status - waiting..."
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+          if [ "$status" != "healthy" ]; then
+            echo "web-${{ steps.current_web.outputs.inactive }} failed to become healthy"
+            exit 1
+          fi
+
+      - name: Switch nginx to inactive Web
+        run: |
+          docker exec homelab-nginx sed -i 's/set \$frontend_upstream web-${{ steps.current_web.outputs.active }}:5173;/set \$frontend_upstream web-${{ steps.current_web.outputs.inactive }}:5173;/' /etc/nginx/conf.d/default.conf
+
+      - name: Reload nginx configuration for Web
+        run: |
+          docker exec homelab-nginx nginx -s reload
+
+      - name: Stop old Web
+        run: |
+          echo "Stopping web-${{ steps.current_web.outputs.active }}..."
+          docker compose stop web-${{ steps.current_web.outputs.active }}
 
       - name: Verify deployment
         run: |
           echo "Active API: api-${{ steps.current.outputs.inactive }}"
-          echo "Frontend: web"
+          echo "Active Web: web-${{ steps.current_web.outputs.inactive }}"
           docker compose ps
