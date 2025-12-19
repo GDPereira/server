@@ -1,13 +1,12 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'react-router-dom';
-import { AxiosError } from 'axios';
-import { loginSchema, type LoginInput } from '../../types/auth';
-import { useAuth } from '../../contexts/auth-context';
-import { Input } from '../ui/input';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AxiosError } from "axios";
+import { loginSchema, type LoginInput } from "../../types/auth";
+import { useAuth } from "../../contexts/auth-context";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Label } from "../ui/label";
 
 export function LoginForm() {
   const { login } = useAuth();
@@ -29,7 +28,7 @@ export function LoginForm() {
       if (err instanceof AxiosError && err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
-        setError('Login failed. Please try again.');
+        setError("Login failed. Please try again.");
       }
     }
   };
@@ -48,7 +47,7 @@ export function LoginForm() {
           id="email"
           type="email"
           autoComplete="email"
-          {...register('email')}
+          {...register("email")}
           error={errors.email?.message}
         />
       </div>
@@ -59,21 +58,21 @@ export function LoginForm() {
           id="password"
           type="password"
           autoComplete="current-password"
-          {...register('password')}
+          {...register("password")}
           error={errors.password?.message}
         />
       </div>
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? 'Signing in...' : 'Sign in'}
+        {isSubmitting ? "Signing in..." : "Sign in"}
       </Button>
 
-      <p className="text-center text-sm text-gray-600">
+      {/* <p className="text-center text-sm text-gray-600">
         Don't have an account?{' '}
         <Link to="/signup" className="text-indigo-600 hover:text-indigo-500">
           Sign up
         </Link>
-      </p>
+      </p> */}
     </form>
   );
 }
